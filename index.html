@@ -1,15 +1,191 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>My GitHub Page</title>
-  <style>
-    body { font-family: Arial; padding: 40px; max-width: 700px; margin: auto; }
-    h1 { color: #2d6cdf; }
-  </style>
-</head>
-<body>
-  <h1>Hello, world!</h1>
-  <p>Welcome to my website hosted on GitHub Pages.</p>
-</body>
-</html>
+import { useState, useRef, MouseEvent } from "react";
+
+interface InteractiveClockProps {
+  hour: number;
+  minute: number;
+  interactive?: boolean;
+  onTimeChange?: (hour: number, minute: number) => void;
+}
+
+export function InteractiveClock({
+  hour,
+  minute,
+  interactive = false,
+  onTimeChange,
+}: InteractiveClockProps) {
+  const [isDragging, setIsDragging] = useState<"hour" | "minute" | null>(null);
+  const clockRef = useRef<SVGSVGElement>(null);
+
+  const hourAngle = ((hour % 12) * 30 + minute * 0.5) % 360;
+  const minuteAngle = (minute * 6) % 360;
+
+  const getAngleFromMouse = (e: MouseEvent<SVGSVGElement>): number => {
+    if (!clockRef.current) return 0;
+    const rect = clockRef.current.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const dx = e.clientX - centerX;
+    const dy = e.clientY - centerY;
+    let angle = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
+    if (angle < 0) angle += 360;
+    return angle;
+  };
+
+  const handleMouseDown = (hand: "hour" | "minute") => {
+    if (!interactive) return;
+    setIsDragging(hand);
+  };
+
+  const handleMouseMove = (e: MouseEvent<SVGSVGElement>) => {
+    if (!isDragging || !interactive || !onTimeChange) return;
+
+    const angle = getAngleFromMouse(e);
+
+    if (isDragging === "minute") {
+      const newMinute = Math.round(angle / 6) % 60;
+      const roundedMinute = Math.round(newMinute / 5) * 5; // Snap to 5-minute intervals
+      onTimeChange(hour, roundedMinute);
+    } else if (isDragging === "hour") {
+      const newHour = Math.round(angle / 30) % 12;
+      const finalHour = newHour === 0 ? 12 : newHour;
+      onTimeChange(finalHour, minute);
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(null);
+  };
+
+  const renderNumbers = () => {
+    const numbers = [];
+    for (let i = 1; i <= 12; i++) {
+      const angle = ((i * 30 - 90) * Math.PI) / 180;
+      const x = 200 + 120 * Math.cos(angle);
+      const y = 200 + 120 * Math.sin(angle);
+      numbers.push(
+        <text
+          key={i}
+          x={x}
+          y={y}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          className="select-none"
+          style={{ fontSize: "24px", fill: "#333" }}
+        >
+          {i}
+        </text>
+      );
+    }
+    return numbers;
+  };
+
+  const renderMinuteMarks = () => {
+    const marks = [];
+    for (let i = 0; i < 60; i++) {
+      const angle = ((i * 6 - 90) * Math.PI) / 180;
+      const isHourMark = i % 5 === 0;
+      const innerRadius = isHourMark ? 145 : 150;
+      const outerRadius = 155;
+      const x1 = 200 + innerRadius * Math.cos(angle);
+      const y1 = 200 + innerRadius * Math.sin(angle);
+      const x2 = 200 + outerRadius * Math.cos(angle);
+      const y2 = 200 + outerRadius * Math.sin(angle);
+      marks.push(
+        <line
+          key={i}
+          x1={x1}
+          y1={y1}
+          x2={x2}
+          y2={y2}
+          stroke="#666"
+          strokeWidth={isHourMark ? "3" : "1"}
+        />
+      );
+    }
+    return marks;
+  };
+
+  return (
+    <svg
+      ref={clockRef}
+      width="300"
+      height="300"
+      viewBox="0 0 400 400"
+      className={interactive ? "cursor-pointer" : ""}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+    >
+      {/* Clock face */}
+      <circle cx="200" cy="200" r="160" fill="white" stroke="#333" strokeWidth="4" />
+
+      {/* Minute marks */}
+      {renderMinuteMarks()}
+
+      {/* Numbers */}
+      {renderNumbers()}
+
+      {/* Hour hand */}
+      <g
+        onMouseDown={() => handleMouseDown("hour")}
+        className={interactive ? "cursor-grab active:cursor-grabbing" : ""}
+      >
+        <line
+          x1="200"
+          y1="200"
+          x2={200 + 70 * Math.sin((hourAngle * Math.PI) / 180)}
+          y2={200 - 70 * Math.cos((hourAngle * Math.PI) / 180)}
+          stroke="#333"
+          strokeWidth="8"
+          strokeLinecap="round"
+          className={isDragging === "hour" ? "opacity-70" : ""}
+        />
+        <circle
+          cx={200 + 70 * Math.sin((hourAngle * Math.PI) / 180)}
+          cy={200 - 70 * Math.cos((hourAngle * Math.PI) / 180)}
+          r={interactive ? "12" : "0"}
+          fill="#333"
+          opacity="0.3"
+        />
+      </g>
+
+      {/* Minute hand */}
+      <g
+        onMouseDown={() => handleMouseDown("minute")}
+        className={interactive ? "cursor-grab active:cursor-grabbing" : ""}
+      >
+        <line
+          x1="200"
+          y1="200"
+          x2={200 + 100 * Math.sin((minuteAngle * Math.PI) / 180)}
+          y2={200 - 100 * Math.cos((minuteAngle * Math.PI) / 180)}
+          stroke="#e74c3c"
+          strokeWidth="6"
+          strokeLinecap="round"
+          className={isDragging === "minute" ? "opacity-70" : ""}
+        />
+        <circle
+          cx={200 + 100 * Math.sin((minuteAngle * Math.PI) / 180)}
+          cy={200 - 100 * Math.cos((minuteAngle * Math.PI) / 180)}
+          r={interactive ? "12" : "0"}
+          fill="#e74c3c"
+          opacity="0.3"
+        />
+      </g>
+
+      {/* Center dot */}
+      <circle cx="200" cy="200" r="10" fill="#333" />
+
+      {/* Time display (digital) */}
+      <text
+        x="200"
+        y="280"
+        textAnchor="middle"
+        className="select-none"
+        style={{ fontSize: "20px", fill: "#666" }}
+      >
+        {hour}:{minute.toString().padStart(2, "0")}
+      </text>
+    </svg>
+  );
+}
